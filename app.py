@@ -6,9 +6,14 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 import logging
+import sys
 
 # Configurazione logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -35,23 +40,29 @@ class User(db.Model):
     btc_amount = db.Column(db.Float, nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
 
-# Creazione delle tabelle
-with app.app_context():
-    logger.info("Creating database tables...")
-    db.create_all()
-    
-    # Inserimento degli utenti iniziali se il database è vuoto
-    if not User.query.first():
-        logger.info("Initializing database with default users...")
-        alessandro = User(username='Alessandro', btc_amount=0.001, is_admin=False)
-        andrea = User(username='Andrea', btc_amount=0.001, is_admin=False)
-        admin = User(username='Admin', btc_amount=0.0045, is_admin=True)
+def init_db():
+    """Inizializza il database e crea gli utenti iniziali"""
+    try:
+        logger.info("Creating database tables...")
+        db.create_all()
         
-        db.session.add(alessandro)
-        db.session.add(andrea)
-        db.session.add(admin)
-        db.session.commit()
-        logger.info("Default users created successfully")
+        # Inserimento degli utenti iniziali se il database è vuoto
+        if not User.query.first():
+            logger.info("Initializing database with default users...")
+            alessandro = User(username='Alessandro', btc_amount=0.001, is_admin=False)
+            andrea = User(username='Andrea', btc_amount=0.001, is_admin=False)
+            admin = User(username='Admin', btc_amount=0.0045, is_admin=True)
+            
+            db.session.add(alessandro)
+            db.session.add(andrea)
+            db.session.add(admin)
+            db.session.commit()
+            logger.info("Default users created successfully")
+        else:
+            logger.info("Database already contains users")
+    except Exception as e:
+        logger.error(f"Error initializing database: {str(e)}")
+        raise
 
 def get_btc_price():
     """Ottiene il prezzo attuale del Bitcoin in USD"""
@@ -66,9 +77,15 @@ def get_btc_price():
 
 @app.route('/', methods=['GET'])
 def home():
+    try:
+        db_status = "connected" if db.session.is_active else "disconnected"
+    except:
+        db_status = "error"
+    
     return jsonify({
         "message": "Bitcoin Wallet API", 
         "status": "running",
+        "database_status": db_status,
         "endpoints": {
             "users": "/api/users",
             "wallet_info": "/api/wallet-info"
@@ -113,6 +130,13 @@ def get_wallet_info():
     except Exception as e:
         logger.error(f"Error getting wallet info: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# Inizializzazione del database
+with app.app_context():
+    try:
+        init_db()
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {str(e)}")
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 8000))
