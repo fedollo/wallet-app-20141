@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+# Configurazione CORS per accettare richieste da qualsiasi origine
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Configurazione del database
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///wallet.db')
@@ -50,6 +51,10 @@ def get_btc_price():
     except:
         return None
 
+@app.route('/', methods=['GET'])
+def home():
+    return jsonify({"message": "Bitcoin Wallet API", "status": "running"})
+
 @app.route('/api/users', methods=['GET'])
 def get_users():
     users = User.query.all()
@@ -79,5 +84,5 @@ def get_wallet_info():
     })
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 8000))
     app.run(host='0.0.0.0', port=port) 
